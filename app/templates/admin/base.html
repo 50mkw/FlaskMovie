@@ -54,7 +54,7 @@
                             </li>
                             <li class="user-footer">
                                 <div class="pull-left">
-                                    <a href="pwd.html" class="btn btn-default btn-flat">修改密码</a>
+                                    <a href="{{ url_for('admin.pwd') }}" class="btn btn-default btn-flat">修改密码</a>
                                 </div>
                                 <div class="pull-right">
                                     <a href="{{ url_for('admin.logout') }}" class="btn btn-default btn-flat">退出系统</a>
@@ -90,15 +90,15 @@
             </form>
             <ul class="sidebar-menu">
                 <li class="header">管理菜单</li>
-                <li class="treeview">
+                <li class="treeview" id="g-1">
                     <a href="#">
                         <i class="fa fa-home" aria-hidden="true"></i>
                         <span>首页</span>
                         <span class="label label-primary pull-right">1</span>
                     </a>
                     <ul class="treeview-menu">
-                        <li>
-                            <a href="index.html">
+                        <li id="g-1-1">
+                            <a href="{{ url_for('admin.index') }}">
                                 <i class="fa fa-circle-o"></i> 控制面板
                             </a>
                         </li>
