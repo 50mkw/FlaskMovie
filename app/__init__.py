@@ -14,4 +14,4 @@ migrate = Migrate(app, db)
 
 app.register_blueprint(home_blueprint)
 app.register_blueprint(admin_blueprint, url_prefix="/admin")
-from app import models
+# from app import models
