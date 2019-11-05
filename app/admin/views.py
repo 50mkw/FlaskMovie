@@ -66,3 +66,23 @@ def user_view():
 @admin.route("/comment/list/")
 def comment_list():
     return render_template('admin/comment_list.html')
+
+
+@admin.route("/collect/list/")
+def collect_list():
+    return render_template('admin/collect_list.html')
+
+
+@admin.route("/logs/operate_log/")
+def logs_operate_log():
+    return render_template('admin/logs_operate_log.html')
+
+
+@admin.route("/logs/admin_log/")
+def logs_admin_log():
+    return render_template('admin/logs_admin_log.html')
+
+
+@admin.route("/logs/user_log/")
+def logs_user_log():
+    return render_template('admin/logs_user_log.html')
