@@ -86,3 +86,33 @@ def logs_admin_log():
 @admin.route("/logs/user_log/")
 def logs_user_log():
     return render_template('admin/logs_user_log.html')
+
+
+@admin.route("/auth/add/")
+def auth_add():
+    return render_template('admin/auth_add.html')
+
+
+@admin.route("/auth/list/")
+def auth_list():
+    return render_template('admin/auth_list.html')
+
+
+@admin.route("/role/add/")
+def role_add():
+    return render_template('admin/role_add.html')
+
+
+@admin.route("/role/list/")
+def role_list():
+    return render_template('admin/role_list.html')
+
+
+@admin.route("/admin/add/")
+def admin_add():
+    return render_template('admin/admin_add.html')
+
+
+@admin.route("/admin/list/")
+def admin_list():
+    return render_template('admin/admin_list.html')
