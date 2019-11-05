@@ -4,3 +4,5 @@
 /migrations
 __pycache__
 .flaskenv
+nohup.out
+*.mp4

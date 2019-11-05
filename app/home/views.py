@@ -36,3 +36,15 @@ def userlog():
 @home.route('/moviecollect/')
 def moviecollect():
     return render_template('home/moviecollect.html')
+
+@home.route("/indexbanner/")
+def indexbanner():
+    return render_template('home/indexbanner.html')
+
+@home.route('/search/')
+def search():
+    return render_template('home/search.html')
+
+@home.route('/play/')
+def play():
+    return render_template('home/play.html')
