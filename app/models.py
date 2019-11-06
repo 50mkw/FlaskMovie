@@ -141,6 +141,11 @@ class Admin(db.Model):
     def __repr__(self):  # 查询的时候返回
         return "<Admin %r>" % self.name
 
+    def check_pwd(self, input_pwd):
+        """验证密码是否正确，直接将hash密码和输入的密码进行比较，如果相同则，返回True"""
+        from werkzeug.security import check_password_hash
+        return check_password_hash(self.pwd, input_pwd)
+
 
 # 管理员日志
 class AdminLog(db.Model):
