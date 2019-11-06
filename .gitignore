@@ -6,3 +6,4 @@ __pycache__
 .flaskenv
 nohup.out
 *.mp4
+media

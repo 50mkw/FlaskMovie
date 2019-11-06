@@ -1,9 +1,13 @@
 from . import admin
 from flask import render_template, redirect, url_for, flash, session, request
-from app.admin.forms import LoginFrom, TagForm
-from app.models import Admin, Tag
+from app.admin.forms import LoginFrom, TagForm, MovieForm
+from app.models import Admin, Tag, Movie
 from functools import wraps
-from app import db
+from app import db, app
+import os
+import uuid  # 生成唯一字符串
+import datetime  # 生成时间
+from werkzeug.utils import secure_filename
 
 
 def admin_login_require(func):
@@ -14,6 +18,14 @@ def admin_login_require(func):
             return redirect(url_for('admin.login', next=request.url))
         return func(*args, **kwargs)
     return decorated_function
+
+
+# 修改文件名称
+def change_filename(filename):
+    fileinfo = os.path.splitext(filename)  # 分离包含路径的文件名与包含点号的扩展名
+    filename = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + str(uuid.uuid4().hex + fileinfo[-1])
+    return filename
+
 
 # 调用蓝图
 @admin.route("/")
@@ -117,16 +129,167 @@ def tag_update(update_id=None):
     return render_template('admin/tag_update.html', form=form, tag=tag)
 
 
-@admin.route("/movie/add/")
+@admin.route("/movie/add/", methods=['GET', 'POST'])
 @admin_login_require
 def movie_add():
-    return render_template('admin/movie_add.html')
+    form = MovieForm()
+    if form.validate_on_submit():
+        data = form.data
+
+        # 提交的片名在数据库中已存在
+        if Movie.query.filter_by(title=data['title']).count() == 1:
+            flash('电影片名已存在，请检查', category='err')
+            return redirect(url_for('admin.movie_add'))
+
+        # 获取上传文件的名称
+        file_url = secure_filename(form.url.data.filename)
+        file_logo = secure_filename(form.logo.data.filename)
+        # 文件保存路径操作
+        file_save_path = app.config['UP_DIR']  # 文件上传保存路径
+        if not os.path.exists(file_save_path):
+            os.makedirs(file_save_path)  # 如果文件保存路径不存在，则创建一个多级目录
+            import stat
+            os.chmod(file_save_path, stat.S_IRWXU)  # 授予可读写权限
+        # 对上传的文件进行重命名
+        url = change_filename(file_url)
+        logo = change_filename(file_logo)
+        # 保存文件，需要给文件的保存路径+文件名
+        form.url.data.save(file_save_path + url)
+        form.logo.data.save(file_save_path + logo)
+
+        movie = Movie(
+            title=data['title'],
+            url=url,
+            info=data['info'],
+            logo=logo,
+            star=data['star'],
+            play_num=0,
+            comment_num=0,
+            tag_id=data['tag_id'],
+            area=data['area'],
+            release_time=data['release_time'],
+            length=data['length']
+        )
+        db.session.add(movie)
+        db.session.commit()
+        flash('添加电影成功', 'ok')
+        return redirect(url_for('admin.movie_add'))
+    return render_template('admin/movie_add.html', form=form)
 
 
-@admin.route("/movie/list/")
+@admin.route("/movie/list/<int:page>/", methods=['GET'])
 @admin_login_require
-def movie_list():
-    return render_template('admin/movie_list.html')
+def movie_list(page=None):
+    if page is None:
+        page = 1
+    # 查询的时候关联标签Tag进行查询：使用join(Tag)
+    # 单表过滤使用filter_by，多表关联使用filter，将Tag.id与Movie的tag_id进行关联
+    page_movies = Movie.query.join(Tag).filter(
+        Tag.id == Movie.tag_id
+    ).order_by(
+        Movie.add_time.desc()
+    ).paginate(page=page, per_page=10)
+    return render_template('admin/movie_list.html', page_movies=page_movies)
+
+
+@admin.route("/movie/delete/<int:delete_id>/", methods=['GET'])
+@admin_login_require
+def movie_delete(delete_id=None):
+    if delete_id:
+        movie = Movie.query.filter_by(id=delete_id).first_or_404()
+        print(movie.logo)
+        # 删除电影同时要从磁盘中删除电影的文件和封面文件
+        file_save_path = app.config['UP_DIR']  # 文件上传保存路径
+        # 如果存在将进行删除，不判断，如果文件不存在删除会报错
+        if os.path.exists(os.path.join(file_save_path, movie.url)):
+            os.remove(os.path.join(file_save_path, movie.url))
+        if os.path.exists(os.path.join(file_save_path, movie.logo)):
+            os.remove(os.path.join(file_save_path, movie.logo))
+
+        # 删除数据库，提交修改，注意后面要把与电影有关的评论都要删除
+        db.session.delete(movie)
+        db.session.commit()
+        # 删除后闪现消息
+        flash('删除电影成功！', category='ok')
+    return redirect(url_for('admin.movie_list', page=1))
+
+
+@admin.route("/movie/update/<int:update_id>/", methods=['GET', 'POST'])
+@admin_login_require
+def movie_update(update_id=None):
+    movie = Movie.query.get_or_404(int(update_id))
+    # 给表单赋初始值，文件表单不处理
+    form = MovieForm(
+        title=movie.title,
+        # url=movie.url,  # 上传文件，这样赋初始值无效，在前端可以通过上传路径+movie.url来获取文件的保存路径，显示在页面上
+        info=movie.info,
+        # logo=movie.logo,  # 上传图片和文件类似
+        star=movie.star,
+        tag_id=movie.tag_id,
+        area=movie.area,
+        release_time=movie.release_time,
+        length=movie.length,
+    )
+    # 对于修改数据，电影文件和封面图已存在，可以非必填:按照教程上测试了validators参数，但始终不行，最终修改required的值就可以了
+    form.url.validators = []
+    # print(form.url)  # <input id="url" name="url" required type="file">
+    if form.url.render_kw:
+        form.url.render_kw['required'] = False
+    else:
+        form.url.render_kw = {'required': False}
+    # print(form.url)  # <input id="url" name="url" type="file">
+
+    form.logo.validators = []  # 验证列表为空
+    form.logo.render_kw = {'required': False}  # 直接修改required为False表明不要求输入
+
+    if form.validate_on_submit():
+        data = form.data
+        # 提交的片名在数据库中已存在，且不是当前的电影名称
+        if Movie.query.filter_by(title=data['title']).count() == 1 and movie.title != data['title']:
+            flash('电影片名已存在，请检查', category='err')
+            return redirect(url_for('admin.movie_update', update_id=update_id))
+        # 以下和直接修改的数据
+        movie.title = data['title']
+        movie.info = data['info']
+        movie.star = data['star']
+        movie.tag_id = data['tag_id']
+        movie.area = data['area']
+        movie.release_time = data['release_time']
+        movie.length = data['length']
+
+        # 文件保存路径操作
+        file_save_path = app.config['UP_DIR']  # 文件上传保存路径
+        if not os.path.exists(file_save_path):
+            os.makedirs(file_save_path)  # 如果文件保存路径不存在，则创建一个多级目录
+            import stat
+            os.chmod(file_save_path, stat.S_IRWXU)  # 授予可读写权限
+
+        print(form.url.data, type(form.url.data))
+        # <FileStorage: 'ssh.jpg' ('image/jpeg')> <class 'werkzeug.datastructures.FileStorage'>
+        # 处理电影文件逻辑：先从磁盘中删除旧文件，然后保存新文件
+        if form.url.data:  # 上传文件不为空，才进行保存
+            # 删除以前的文件
+            if os.path.exists(os.path.join(file_save_path, movie.url)):
+                os.remove(os.path.join(file_save_path, movie.url))
+            # 获取上传文件的名称
+            file_url = secure_filename(form.url.data.filename)
+            # 对上传的文件进行重命名
+            movie.url = change_filename(file_url)
+            # 保存文件，需要给文件的保存路径+文件名
+            form.url.data.save(file_save_path + movie.url)
+
+        # 处理封面图
+        if form.logo.data:
+            if os.path.exists(os.path.join(file_save_path, movie.logo)):
+                os.remove(os.path.join(file_save_path, movie.logo))
+            file_logo = secure_filename(form.logo.data.filename)
+            movie.logo = change_filename(file_logo)
+            form.logo.data.save(file_save_path + movie.logo)
+        db.session.merge(movie)  # 调用merge方法，此时Movie实体状态并没有被持久化，但是数据库中的记录被更新了（暂时不明白）
+        db.session.commit()
+        flash('修改电影成功', 'ok')
+        return redirect(url_for('admin.movie_update', update_id=update_id))
+    return render_template('admin/movie_update.html', form=form, movie=movie)
 
 
 @admin.route("/preview/add/")
