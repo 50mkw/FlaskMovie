@@ -1,7 +1,7 @@
 from . import admin
 from flask import render_template, redirect, url_for, flash, session, request
 from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm
-from app.models import Admin, Tag, Movie, Preview, User, Comment
+from app.models import Admin, Tag, Movie, Preview, User, Comment, MovieCollect
 from functools import wraps
 from app import db, app
 import os
@@ -453,10 +453,32 @@ def comment_delete(delete_id=None):
     return redirect(url_for('admin.comment_list', page=1))
 
 
-@admin.route("/collect/list/")
+@admin.route("/collect/list/<int:page>/")
 @admin_login_require
-def collect_list():
-    return render_template('admin/collect_list.html')
+def collect_list(page=None):
+    if page is None:
+        page = 1
+    page_moviecollects = MovieCollect.query.join(
+        Movie
+    ).join(
+        User
+    ).filter(
+        Movie.id == MovieCollect.movie_id,
+        User.id == MovieCollect.user_id
+    ).order_by(
+        MovieCollect.add_time.desc()
+    ).paginate(page=page, per_page=10)
+    return render_template('admin/collect_list.html', page_moviecollects=page_moviecollects)
+
+
+@admin.route("/collect/delete/<int:delete_id>")
+@admin_login_require
+def collect_delete(delete_id=None):
+    moviecollect = MovieCollect.query.get_or_404(delete_id)
+    db.session.delete(moviecollect)
+    db.session.commit()
+    flash('删除收藏成功！', category='ok')
+    return redirect(url_for('admin.comment_list', page=1))
 
 
 @admin.route("/logs/operate_log/")

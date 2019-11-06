@@ -5,6 +5,7 @@
 __pycache__
 .flaskenv
 nohup.out
+REMARK.txt
 *.bak
 **/user/*.jpg
 **/media/*.png
