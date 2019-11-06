@@ -122,7 +122,7 @@ class MovieForm(FlaskForm):
             DataRequired('请选择标签！')
         ],
         coerce=int,
-        choices=[(tag.id, tag.name) for tag in Tag.query.all()],
+        # choices=[(tag.id, tag.name) for tag in Tag.query.all()],
         description='标签',
         render_kw={
             'class': "form-control"
@@ -169,6 +169,10 @@ class MovieForm(FlaskForm):
         }
     )
 
+    def __init__(self, *args, **kwargs):
+        super(MovieForm, self).__init__(*args, **kwargs)
+        self.tag_id.choices = [(v.id, v.name) for v in Tag.query.all()]
+
 
 class PreviewForm(FlaskForm):
     title = StringField(
@@ -193,3 +197,45 @@ class PreviewForm(FlaskForm):
             'class': "btn btn-primary"
         }
     )
+
+
+class PwdForm(FlaskForm):
+    old_pwd = PasswordField(
+        label='旧密码',
+        validators=[
+            DataRequired('请输入旧密码！')
+        ],
+        description='旧密码',
+        render_kw={
+            'class': "form-control",
+            'placeholder': "请输入旧密码",
+            'required': "required"
+        }
+    )
+    new_pwd = PasswordField(
+        label='新密码',
+        validators=[
+            DataRequired('请输入新密码！')
+        ],
+        description='新密码',
+        render_kw={
+            'class': "form-control",
+            'placeholder': "请输入新密码",
+            'required': "required"
+        }
+    )
+    submit = SubmitField(
+        label='提交',
+        render_kw={
+            'class': "btn btn-primary"
+        }
+    )
+
+    def validate_old_pwd(self, field):
+        """检查验证旧密码是否正确"""
+        from flask import session
+        old_pwd = field.data
+        login_name = session['login_admin']
+        admin = Admin.query.filter_by(name=login_name).first()
+        if not admin.check_pwd(old_pwd):
+            raise ValidationError('旧密码错误！')

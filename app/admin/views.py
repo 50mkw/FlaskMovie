@@ -1,6 +1,6 @@
 from . import admin
 from flask import render_template, redirect, url_for, flash, session, request
-from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm
+from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm, PwdForm
 from app.models import Admin, Tag, Movie, Preview, User, Comment, MovieCollect
 from functools import wraps
 from app import db, app
@@ -59,10 +59,20 @@ def logout():
     return redirect(url_for("admin.login"))
 
 
-@admin.route("/pwd/")
+@admin.route("/pwd/", methods=['GET', 'POST'])
 @admin_login_require
 def pwd():
-    return render_template('admin/pwd.html')
+    form = PwdForm()
+    if form.validate_on_submit():
+        data = form.data
+        login_name = session['login_admin']
+        admin = Admin.query.filter_by(name=login_name).first()
+        from werkzeug.security import generate_password_hash
+        admin.pwd = generate_password_hash(data['new_pwd'])
+        db.session.commit()  # 提交新密码保存，然后跳转到登录界面
+        flash('密码修改成功，请重新登录！', category='ok')
+        return redirect(url_for('admin.logout'))
+    return render_template('admin/pwd.html', form=form)
 
 
 @admin.route("/tag/add/", methods=['GET', 'POST'])
