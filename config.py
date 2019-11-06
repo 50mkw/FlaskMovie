@@ -8,3 +8,4 @@ class Config(object):
     SQLALCHEMY_TRACK_MODIFICATIONS = True
     # 定义文件上传保存的路径，在__init__.py文件所在目录创建media文件夹，用于保存上传的文件
     UP_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app/static/media/')
+    USER_IMAGE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app/static/user/')  # 存放用户头像的路径

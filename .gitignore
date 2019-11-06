@@ -5,6 +5,8 @@
 __pycache__
 .flaskenv
 nohup.out
-*.mp4
-media
 *.bak
+**/user/*.jpg
+**/media/*.png
+**/media/*.mp4
+**/video/*.mp4

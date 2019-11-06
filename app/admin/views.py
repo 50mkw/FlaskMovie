@@ -1,7 +1,7 @@
 from . import admin
 from flask import render_template, redirect, url_for, flash, session, request
 from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm
-from app.models import Admin, Tag, Movie, Preview
+from app.models import Admin, Tag, Movie, Preview, User
 from functools import wraps
 from app import db, app
 import os
@@ -391,16 +391,38 @@ def preview_update(update_id=None):
     return render_template('admin/preview_edit.html', form=form, preview=preview)
 
 
-@admin.route("/user/list/")
+@admin.route("/user/list/<int:page>/")
 @admin_login_require
-def user_list():
-    return render_template('admin/user_list.html')
+def user_list(page=None):
+    if page is None:
+        page = 1
+    page_users = User.query.paginate(page=page, per_page=10)
+    return render_template('admin/user_list.html', page_users=page_users)
 
 
-@admin.route("/user/view/")
+@admin.route("/user/view/<int:user_id>/")
 @admin_login_require
-def user_view():
-    return render_template('admin/user_view.html')
+def user_view(user_id=None):
+    user = User.query.get_or_404(user_id)
+    return render_template('admin/user_view.html', user=user)
+
+
+@admin.route("/user/delete/<int:delete_id>/")
+@admin_login_require
+def user_delete(delete_id=None):
+    user = User.query.get_or_404(delete_id)
+    # 删除同时要从磁盘中删除封面文件
+    file_save_path = app.config['USER_IMAGE']  # 头像上传保存路径
+    # 如果存在将进行删除，不判断，如果文件不存在删除会报错
+    if os.path.exists(os.path.join(file_save_path, user.face)):
+        os.remove(os.path.join(file_save_path, user.face))
+
+    # 删除数据库，提交修改
+    db.session.delete(user)
+    db.session.commit()
+    # 删除后闪现消息
+    flash('删除会员成功！', category='ok')
+    return redirect(url_for('admin.user_list', page=1))
 
 
 @admin.route("/comment/list/")
