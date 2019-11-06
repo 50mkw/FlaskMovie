@@ -1,7 +1,7 @@
 from . import admin
 from flask import render_template, redirect, url_for, flash, session, request
-from app.admin.forms import LoginFrom, TagForm, MovieForm
-from app.models import Admin, Tag, Movie
+from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm
+from app.models import Admin, Tag, Movie, Preview
 from functools import wraps
 from app import db, app
 import os
@@ -292,16 +292,103 @@ def movie_update(update_id=None):
     return render_template('admin/movie_update.html', form=form, movie=movie)
 
 
-@admin.route("/preview/add/")
+@admin.route("/preview/add/", methods=['GET', 'POST'])
 @admin_login_require
 def preview_add():
-    return render_template('admin/preview_add.html')
+    form = PreviewForm()
+    if form.validate_on_submit():
+        data = form.data
+        if Preview.query.filter_by(title=data['title']).count() == 1:
+            flash('预告标题已存在，请检查！', category='err')
+            return redirect(url_for('admin.preview_add'))
+
+        file_logo = secure_filename(form.logo.data.filename)  # 获取上传文件名字
+        file_save_path = app.config['UP_DIR']  # 文件上传保存路径
+        if not os.path.exists(file_save_path):
+            os.makedirs(file_save_path)  # 如果文件保存路径不存在，则创建一个多级目录
+            import stat
+            os.chmod(file_save_path, stat.S_IRWXU)  # 授予可读写权限
+        logo = change_filename(file_logo)  # 文件重命名
+        form.logo.data.save(file_save_path + logo)  # 保存文件到磁盘中
+
+        preview = Preview(
+            title=data['title'],
+            logo=logo  # 只在数据库中保存文件名
+        )
+        db.session.add(preview)
+        db.session.commit()
+        flash('添加预告成功', 'ok')
+        return redirect(url_for('admin.preview_add'))
+
+    return render_template('admin/preview_edit.html', form=form)
 
 
-@admin.route("/preview/list/")
+@admin.route("/preview/list/<int:page>/")
 @admin_login_require
-def preview_list():
-    return render_template('admin/preview_list.html')
+def preview_list(page=None):
+    page_previews = Preview.query.paginate(page=page, per_page=10)
+    return render_template('admin/preview_list.html', page_previews=page_previews)
+
+
+@admin.route("/preview/delete/<int:delete_id>/", methods=['GET'])
+@admin_login_require
+def preview_delete(delete_id=None):
+    if delete_id:
+        preview = Preview.query.filter_by(id=delete_id).first_or_404()
+        # 删除同时要从磁盘中删除封面文件
+        file_save_path = app.config['UP_DIR']  # 文件上传保存路径
+        # 如果存在将进行删除，不判断，如果文件不存在删除会报错
+        if os.path.exists(os.path.join(file_save_path, preview.logo)):
+            os.remove(os.path.join(file_save_path, preview.logo))
+
+        # 删除数据库，提交修改，注意后面要把与电影有关的评论都要删除
+        db.session.delete(preview)
+        db.session.commit()
+        # 删除后闪现消息
+        flash('删除预告成功！', category='ok')
+    return redirect(url_for('admin.preview_list', page=1))
+
+
+@admin.route("/preview/update/<int:update_id>/", methods=['GET', 'POST'])
+@admin_login_require
+def preview_update(update_id=None):
+    preview = Preview.query.get_or_404(update_id)
+    form = PreviewForm(
+        title=preview.title,
+    )
+    # 不验证上传文件
+    form.logo.validators = []
+    form.logo.render_kw = {'required': False}
+
+    if form.validate_on_submit():
+        data = form.data
+        if Preview.query.filter_by(title=data['title']).count() == 1 and preview.title != data['title']:
+            flash('预告标题已存在，请重新输入', category='err')
+            return redirect(url_for('admin.preview_update', update_id=update_id))
+
+        preview.title = data['title']
+
+        print(data['logo'], type(data['logo']), form.logo.data, type(form.logo.data))
+        # <FileStorage: 'ssh.jpg' ('image/jpeg')> <class 'werkzeug.datastructures.FileStorage'>
+        # <FileStorage: 'ssh.jpg' ('image/jpeg')> <class 'werkzeug.datastructures.FileStorage'>
+        # 上面两种方式结果一样
+
+        # 文件保存路径操作
+        file_save_path = app.config['UP_DIR']  # 文件上传保存路径
+        if not os.path.exists(file_save_path):
+            os.makedirs(file_save_path)  # 如果文件保存路径不存在，则创建一个多级目录
+            import stat
+            os.chmod(file_save_path, stat.S_IRWXU)  # 授予可读写权限
+        if form.logo.data:  # 当有上传新的图片
+            if os.path.exists(os.path.join(file_save_path, preview.logo)):
+                os.remove(os.path.join(file_save_path, preview.logo))  # 删除旧图片
+            file_logo_name = form.logo.data.filename
+            preview.logo = change_filename(file_logo_name)  # 得到新的文件名，保存到输入局
+            form.logo.data.save(file_save_path + preview.logo)
+        db.session.commit()
+        flash('预告信息修改成功！', category='ok')
+        return redirect(url_for('admin.preview_update', update_id=update_id))
+    return render_template('admin/preview_edit.html', form=form, preview=preview)
 
 
 @admin.route("/user/list/")
