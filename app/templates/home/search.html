@@ -8,28 +8,19 @@
             </ol>
         </div>
         <div class="col-md-12">
-            <div class="media">
-                <div class="media-left">
-                    <a href="play.html">
-                        <img class="media-object" src="holder.js/131x83" alt="环太平洋">
-                    </a>
+            {% for search_movie in search_movies %}
+                <div class="media">
+                    <div class="media-left">
+                        <a href="play.html">
+                            <img class="media-object" src="{{ url_for('static', filename='media/' + search_movie.logo) }}" alt="{{ search_movie.title }}" style="width: 150px">
+                        </a>
+                    </div>
+                    <div class="media-body">
+                        <h4 class="media-heading">{{ search_movie.title }}<a href="play.html" class="label label-primary pull-right"><span class="glyphicon glyphicon-play"></span>播放影片</a></h4>
+                        {{ search_movie.info }}
+                    </div>
                 </div>
-                <div class="media-body">
-                    <h4 class="media-heading">环太平洋<a href="play.html" class="label label-primary pull-right"><span class="glyphicon glyphicon-play"></span>播放影片</a></h4>
-                    该片主要讲述了人类为了抵抗怪兽的进攻，研制出了高大的机器战士与来犯怪兽进行对抗的故事。
-                </div>
-            </div>
-            <div class="media">
-                <div class="media-left">
-                    <a href="play.html">
-                        <img class="media-object" src="holder.js/131x83" alt="环太平洋">
-                    </a>
-                </div>
-                <div class="media-body">
-                    <h4 class="media-heading">环太平洋<a href="play.html" class="label label-primary pull-right"><span class="glyphicon glyphicon-play"></span>播放影片</a></h4>
-                    该片主要讲述了人类为了抵抗怪兽的进攻，研制出了高大的机器战士与来犯怪兽进行对抗的故事。
-                </div>
-            </div>
+            {% endfor %}
         </div>
         <div class="col-md-12 text-center">
             <nav aria-label="Page navigation">
