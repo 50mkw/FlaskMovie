@@ -5,7 +5,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 def get_redis_url():
     config = configparser.ConfigParser()
-    config.read(r'config/ProjectConfig.ini')
+    config.read(r'cfg/ProjectConfig.ini')
     return 'redis://:{password}@{host}:{port}/1'.format(
         host=config['redis-djangostarmeow']['host'],
         port=config['redis-djangostarmeow']['port'],
