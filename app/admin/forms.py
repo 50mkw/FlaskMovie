@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm  # 表单基类
-from wtforms import StringField, PasswordField, SubmitField, FileField, TextAreaField, SelectField
+from wtforms import StringField, PasswordField, SubmitField, FileField, TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, ValidationError
-from app.models import Admin, Tag
+from app.models import Admin, Tag, Auth
 
 
 class LoginFrom(FlaskForm):
@@ -269,3 +269,35 @@ class AuthForm(FlaskForm):
             'class': "btn btn-primary"
         }
     )
+
+
+class RoleForm(FlaskForm):
+    name = StringField(
+        label='角色名称',
+        validators=[
+            DataRequired('请输入角色名称！')
+        ],
+        description='请输入角色名称！',
+        render_kw={
+            'class': "form-control"
+        }
+    )
+    auths = SelectMultipleField(
+        label='权限列表',
+        description='请选择权限列表！',
+        render_kw={
+            'class': "form-control",
+        },
+        coerce=int,
+        # choices=[(item.id, item.name) for item in Auth.query.all()]
+    )
+    submit = SubmitField(
+        label='提交',
+        render_kw={
+            'class': "btn btn-primary"
+        }
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(RoleForm, self).__init__(*args, **kwargs)
+        self.auths.choices = [(item.id, item.name) for item in Auth.query.all()]
