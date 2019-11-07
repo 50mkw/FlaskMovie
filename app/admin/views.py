@@ -1,6 +1,6 @@
 from . import admin
-from flask import render_template, redirect, url_for, flash, session, request
-from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm, PwdForm, AuthForm, RoleForm
+from flask import render_template, redirect, url_for, flash, session, request, abort
+from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm, PwdForm, AuthForm, RoleForm, AdminForm
 from app.models import Admin, Tag, Movie, Preview, User, Comment, MovieCollect, Auth, Role
 from functools import wraps
 from app import db, app
@@ -27,9 +27,37 @@ def change_filename(filename):
     return filename
 
 
+# 权限控制装饰器
+def permission_control(func):
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        login_admin = Admin.query.join(
+            Role
+        ) .filter(
+            Role.id == Admin.role_id,
+            Admin.name == session['login_admin']
+        ).first()
+
+        all_auth = Auth.query.all()  # 数据库所有权限
+        # print(all_auth)
+
+        auths = login_admin.role.auths
+        auths = list(map(lambda item: int(item), auths.split(',')))  # 用户权限id列表
+        urls = [auth.url for auth in all_auth for admin_auth_id in auths if admin_auth_id == auth.id]
+
+        # print(urls)
+        rule = request.url_rule
+        # print(rule)  # 需要转为str判断是否在list中
+        if str(rule) not in urls and login_admin.is_super != 0:  # 权限不存在，且不是超级管理员
+            abort(401)
+        return func(*args, **kwargs)
+    return decorated_function
+
+
 # 调用蓝图
 @admin.route("/")
 @admin_login_require
+@permission_control
 def index():
     return render_template('admin/index.html')
 
@@ -77,6 +105,7 @@ def pwd():
 
 @admin.route("/tag/add/", methods=['GET', 'POST'])
 @admin_login_require
+@permission_control
 def tag_add():
     form = TagForm()
     if form.validate_on_submit():
@@ -207,7 +236,7 @@ def movie_list(page=None):
 def movie_delete(delete_id=None):
     if delete_id:
         movie = Movie.query.filter_by(id=delete_id).first_or_404()
-        print(movie.logo)
+        # print(movie.logo)
         # 删除电影同时要从磁盘中删除电影的文件和封面文件
         file_save_path = app.config['UP_DIR']  # 文件上传保存路径
         # 如果存在将进行删除，不判断，如果文件不存在删除会报错
@@ -274,7 +303,7 @@ def movie_update(update_id=None):
             import stat
             os.chmod(file_save_path, stat.S_IRWXU)  # 授予可读写权限
 
-        print(form.url.data, type(form.url.data))
+        # print(form.url.data, type(form.url.data))
         # <FileStorage: 'ssh.jpg' ('image/jpeg')> <class 'werkzeug.datastructures.FileStorage'>
         # 处理电影文件逻辑：先从磁盘中删除旧文件，然后保存新文件
         if form.url.data:  # 上传文件不为空，才进行保存
@@ -378,7 +407,7 @@ def preview_update(update_id=None):
 
         preview.title = data['title']
 
-        print(data['logo'], type(data['logo']), form.logo.data, type(form.logo.data))
+        # print(data['logo'], type(data['logo']), form.logo.data, type(form.logo.data))
         # <FileStorage: 'ssh.jpg' ('image/jpeg')> <class 'werkzeug.datastructures.FileStorage'>
         # <FileStorage: 'ssh.jpg' ('image/jpeg')> <class 'werkzeug.datastructures.FileStorage'>
         # 上面两种方式结果一样
@@ -622,14 +651,40 @@ def role_update(update_id=None):
     return render_template('admin/role_edit.html', form=form)
 
 
-@admin.route("/admin/add/")
+@admin.route("/admin/add/", methods=['GET', 'POST'])
 @admin_login_require
 def admin_add():
-    return render_template('admin/admin_add.html')
+    form = AdminForm(is_super=1)
+    from werkzeug.security import generate_password_hash
+    # print(form.data)
+    if form.validate_on_submit():
+        data = form.data
+        if Admin.query.filter_by(name=data['name']).count() == 1:
+            flash('管理员已存在！', category='err')
+            return redirect(url_for('admin.admin_add'))
+        add_admin = Admin(
+            name=data['name'],
+            pwd=generate_password_hash(data['pwd']),
+            role_id=data['role_id'],
+            is_super=1
+        )
+        db.session.add(add_admin)
+        db.session.commit()
+        flash('管理员添加成功', category='ok')
+    return render_template('admin/admin_edit.html', form=form)
 
 
-@admin.route("/admin/list/")
+@admin.route("/admin/list/<int:page>")
 @admin_login_require
-def admin_list():
-    return render_template('admin/admin_list.html')
+def admin_list(page=None):
+    if not page:
+        page = 1
+    page_admins = Admin.query.order_by(
+        Admin.add_time.desc()
+    ).join(
+        Role
+    ).filter(
+        Role.id == Admin.role_id  # 关联查询
+    ).paginate(page=page, per_page=10)
+    return render_template('admin/admin_list.html', page_admins=page_admins)
 
