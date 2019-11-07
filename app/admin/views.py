@@ -1,7 +1,7 @@
 from . import admin
 from flask import render_template, redirect, url_for, flash, session, request
-from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm, PwdForm
-from app.models import Admin, Tag, Movie, Preview, User, Comment, MovieCollect
+from app.admin.forms import LoginFrom, TagForm, MovieForm, PreviewForm, PwdForm, AuthForm
+from app.models import Admin, Tag, Movie, Preview, User, Comment, MovieCollect, Auth
 from functools import wraps
 from app import db, app
 import os
@@ -509,16 +509,62 @@ def logs_user_log():
     return render_template('admin/logs_user_log.html')
 
 
-@admin.route("/auth/add/")
+@admin.route("/auth/add/", methods=['GET', 'POST'])
 @admin_login_require
 def auth_add():
-    return render_template('admin/auth_add.html')
+    form = AuthForm()
+    if form.validate_on_submit():
+        data = form.data
+        if Auth.query.filter_by(url=data['url']).count() == 1:
+            flash('权限链接地址已存在！',category='err')
+            return redirect(url_for('admin.auth_add'))
+        auth = Auth(
+            name=data['name'],
+            url=data['url']
+        )
+        db.session.add(auth)
+        db.session.commit()
+        flash('权限地址添加成功！', category='ok')
+    return render_template('admin/auth_edit.html', form=form)
 
 
-@admin.route("/auth/list/")
+@admin.route("/auth/list/<int:page>/")
 @admin_login_require
-def auth_list():
-    return render_template('admin/auth_list.html')
+def auth_list(page=None):
+    if not page:
+        page = 1
+    page_auths = Auth.query.order_by(Auth.add_time.desc()).paginate(page=page, per_page=10)
+    return render_template('admin/auth_list.html', page_auths=page_auths)
+
+
+@admin.route("/auth/delete/<int:delete_id>/")
+@admin_login_require
+def auth_delete(delete_id=None):
+    auth = Auth.query.get_or_404(delete_id)
+    db.session.delete(auth)
+    db.session.commit()
+    flash('删除权限地址成功', category='ok')
+    return redirect(url_for('admin.auth_list', page=1))
+
+
+@admin.route("/auth/update/<int:update_id>/", methods=['GET', 'POST'])
+@admin_login_require
+def auth_update(update_id=None):
+    auth = Auth.query.get_or_404(update_id)
+    form = AuthForm(
+        name=auth.name,
+        url=auth.url
+    )
+    if form.validate_on_submit():
+        data = form.data
+        if Auth.query.filter_by(url=data['url']).count() == 1 and auth.url != data['url']:
+            flash('权限链接地址已存在！', category='err')
+            return redirect(url_for('admin.auth_update', update_id=update_id))
+        auth.name = data['name']
+        auth.url = data['url']
+        db.session.commit()
+        flash('权限地址修改成功！', category='ok')
+    return render_template('admin/auth_edit.html', form=form)
 
 
 @admin.route("/role/add/")

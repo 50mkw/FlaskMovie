@@ -239,3 +239,33 @@ class PwdForm(FlaskForm):
         admin = Admin.query.filter_by(name=login_name).first()
         if not admin.check_pwd(old_pwd):
             raise ValidationError('旧密码错误！')
+
+
+class AuthForm(FlaskForm):
+    name = StringField(
+        label='权限名称',
+        validators=[
+            DataRequired('请输入权限名称！')
+        ],
+        description='请输入权限名称！',
+        render_kw={
+            'class': "form-control"
+        }
+    )
+    url = StringField(
+        label='访问链接',
+        validators=[
+            DataRequired('请输入访问链接！')
+        ],
+        description='请输入访问链接！',
+        render_kw={
+            'class': "form-control",
+            'placeholder': '链接地址'
+        }
+    )
+    submit = SubmitField(
+        label='提交',
+        render_kw={
+            'class': "btn btn-primary"
+        }
+    )
