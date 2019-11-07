@@ -253,37 +253,37 @@ def search():
     return render_template('home/search.html', keyword=keyword, search_movies=search_movies, search_count=search_count)
 
 
-@home.route('/play/<int:movie_id>/', methods=['GET', 'POST'])
-def play(movie_id):
-    movie = Movie.query.join(Tag).filter(
-        Tag.id == Movie.tag_id,
-        Movie.id == int(movie_id)
-    ).first_or_404()
-
-    if request.method == 'GET':
-        movie.play_num += 1
-        db.session.commit()
-
-    form = CommentForm()
-    if 'login_user' not in session:
-        form.submit.render_kw = {
-            'disabled': "disabled",
-            "class": "btn btn-success",
-            "id": "btn-sub"
-        }
-    if form.validate_on_submit() and 'login_user' in session:
-        data = form.data
-        comment = Comment(
-            content=data['content'],
-            movie_id=movie.id,
-            user_id=session['login_user_id']
-        )
-        db.session.add(comment)
-        movie.comment_num += 1
-        db.session.commit()
-        flash('评论成功', category='ok')
-        return redirect(url_for('home.play', movie_id=movie.id))
-    return render_template('home/play.html', movie=movie, form=form)
+# @home.route('/play/<int:movie_id>/', methods=['GET', 'POST'])
+# def play(movie_id):
+#     movie = Movie.query.join(Tag).filter(
+#         Tag.id == Movie.tag_id,
+#         Movie.id == int(movie_id)
+#     ).first_or_404()
+#
+#     if request.method == 'GET':
+#         movie.play_num += 1
+#         db.session.commit()
+#
+#     form = CommentForm()
+#     if 'login_user' not in session:
+#         form.submit.render_kw = {
+#             'disabled': "disabled",
+#             "class": "btn btn-success",
+#             "id": "btn-sub"
+#         }
+#     if form.validate_on_submit() and 'login_user' in session:
+#         data = form.data
+#         comment = Comment(
+#             content=data['content'],
+#             movie_id=movie.id,
+#             user_id=session['login_user_id']
+#         )
+#         db.session.add(comment)
+#         movie.comment_num += 1
+#         db.session.commit()
+#         flash('评论成功', category='ok')
+#         return redirect(url_for('home.play', movie_id=movie.id))
+#     return render_template('home/play.html', movie=movie, form=form)
 
 
 @home.route('/play/<int:movie_id>/page/<int:page>/', methods=['GET', 'POST'])
