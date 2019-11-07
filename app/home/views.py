@@ -20,9 +20,9 @@ def user_login_require(func):
 
     return decorated_function
 
-
+@home.route("/")
 @home.route("/<int:page>/")
-def index(page):
+def index(page=1):
     if not page:
         page = 1
     all_tag = Tag.query.all()
