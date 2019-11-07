@@ -236,6 +236,29 @@ def moviecollect(page):
     return render_template('home/moviecollect.html', page_moviecollects=page_moviecollects)
 
 
+@home.route('/moviecollect/add/')
+@user_login_require
+def add_moviecollect():
+    movie_id = request.args.get('movie_id', '')
+    user_id = request.args.get('user_id', '')
+    movie_collect = MovieCollect.query.filter_by(
+        user_id=int(user_id),
+        movie_id=int(movie_id)
+    )
+    if movie_collect.count() == 1:
+        data = dict(ok=0)
+    if movie_collect.count() == 0:
+        movie_collect = MovieCollect(
+            user_id=int(user_id),
+            movie_id=int(movie_id)
+        )
+        db.session.add(movie_collect)
+        db.session.commit()
+        data = dict(ok=1)
+    import json
+    return json.dumps(data)
+
+
 @home.route("/indexbanner/")
 def indexbanner():
     previews = Preview.query.all()
@@ -332,3 +355,65 @@ def play(movie_id=None, page=None):
     ).paginate(page=page, per_page=10)
 
     return render_template('home/play.html', movie=movie, form=form, page_comments=page_comments)
+
+
+# 处理弹幕消息
+@home.route("/tm/v3/", methods=["GET", "POST"])
+def tm():
+    from flask import Response
+    from app import rd
+    import json
+    import datetime
+    import time
+    resp = ''
+    if request.method == "GET":  # 获取弹幕
+        movie_id = request.args.get('id')  # 用id来获取弹幕消息队列，也就是js中danmaku配置的id
+        key = "movie{}:barrage".format(movie_id)  # 拼接形成键值用于存放在redis队列中
+        if rd.llen(key):
+            msgs = rd.lrange(key, 0, 2999)
+            tm_data = []
+            for msg in msgs:
+                msg = json.loads(msg)
+                # print(msg)
+                tmp_data = [msg['time'], msg['type'], msg['date'], msg['author'], msg['text']]
+                tm_data.append(tmp_data)
+            # print(tm_data)
+            res = {
+                "code": 0,
+                # 参照官网http://dplayer.js.org/#/ 获取弹幕的消息格式
+                # "data": [[6.978, 0, 16777215, "DIYgod", "1111111111111111111"],
+                #          [16.338, 0, 16777215, "DIYgod", "测试"],
+                #          [8.177, 0, 16777215, "DIYgod", "测试"],
+                #          [7.358, 0, 16777215, "DIYgod", "1"],
+                #          [15.748338, 0, 16777215, "DIYgod", "owo"]],
+                "data": tm_data,
+            }
+        else:
+            print('Redis中暂无内容')
+            res = {
+                "code": 1,  # 无内容code为1
+                "data": []
+            }
+        resp = json.dumps(res)
+    if request.method == "POST":  # 添加弹幕
+        data = json.loads(request.get_data())
+        # print(data)
+        msg = {
+            "__v": 0,
+            "author": data["author"],
+            "time": data["time"],  # 发送弹幕视频播放进度时间
+            "date": int(time.time()),  # 当前时间戳
+            "text": data["text"],  # 弹幕内容
+            "color": data["color"],  # 弹幕颜色
+            "type": data['type'],  # 弹幕位置
+            "ip": request.remote_addr,
+            "_id": datetime.datetime.now().strftime("%Y%m%d%H%M%S") + uuid.uuid4().hex,
+            "player": data['id']
+        }
+        res = {
+            "code": 0,
+            "data": msg
+        }
+        resp = json.dumps(res)
+        rd.lpush("movie{}:barrage".format(data['id']), json.dumps(msg))  # 将添加的弹幕推入redis的队列中
+    return Response(resp, mimetype='application/json')

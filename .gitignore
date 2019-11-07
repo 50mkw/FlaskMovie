@@ -11,3 +11,4 @@ REMARK.txt
 **/media/*.png
 **/media/*.mp4
 **/video/*.mp4
+*.rdb

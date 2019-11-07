@@ -3,12 +3,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from config import Config
 from flask import render_template
+from flask_redis import FlaskRedis
 
 
 app = Flask(__name__)  # 实例化flask
 app.debug = True  # 开启调试模式
 app.config.from_object(Config)
 db = SQLAlchemy(app)
+rd = FlaskRedis(app)
 migrate = Migrate(app, db)
 
 from app.home import home as home_blueprint  # 导入
