@@ -1,7 +1,7 @@
 from . import home
 from flask import render_template, redirect, url_for, flash, session, request
 from .forms import RegisterForm, LoginFrom, UserDetailForm, PwdForm
-from app.models import User, UserLog
+from app.models import User, UserLog, Comment, MovieCollect
 from werkzeug.security import generate_password_hash
 from app import db, app
 import uuid
@@ -140,17 +140,43 @@ def pwd():
             return redirect(url_for('home.pwd'))
     return render_template('home/pwd.html', form=form)
 
-@home.route('/comments/')
-def comments():
-    return render_template('home/comments.html')
+@home.route('/comments/<int:page>/')
+@user_login_require
+def comments(page):
+    if not page:
+        page = 1
+    page_comments =Comment.query.filter_by(
+        user_id=int(session['login_user_id'])
+    ).order_by(
+        Comment.add_time.desc()
+    ).paginate(page=page, per_page=10)
+    return render_template('home/comments.html', page_comments=page_comments)
 
-@home.route('/userlog/')
-def userlog():
-    return render_template('home/userlog.html')
+@home.route('/userlog/<int:page>/')
+@user_login_require
+def userlog(page=None):
+    """会员登录日志"""
+    if not page:
+        page = 1
+    page_user_logs = UserLog.query.filter_by(
+        user_id=int(session['login_user_id'])
+    ).order_by(
+        UserLog.add_time.desc()
+    ).paginate(page=page, per_page=10)
+    return render_template('home/userlog.html', page_user_logs=page_user_logs)
 
-@home.route('/moviecollect/')
-def moviecollect():
-    return render_template('home/moviecollect.html')
+@home.route('/moviecollect/<int:page>/')
+@user_login_require
+def moviecollect(page):
+    if not page:
+        page = 1
+    page_moviecollects = MovieCollect.query.filter_by(
+        user_id=int(session['login_user_id'])
+    ).order_by(
+        MovieCollect.add_time.desc()
+    ).paginate(page=page, per_page=10)
+    return render_template('home/moviecollect.html', page_moviecollects=page_moviecollects)
+
 
 @home.route("/indexbanner/")
 def indexbanner():
