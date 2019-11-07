@@ -1,6 +1,6 @@
 from . import home
 from flask import render_template, redirect, url_for, flash, session, request
-from .forms import RegisterForm, LoginFrom, UserDetailForm, PwdForm
+from .forms import RegisterForm, LoginFrom, UserDetailForm, PwdForm, CommentForm
 from app.models import User, UserLog, Comment, MovieCollect, Preview, Movie, Tag
 from werkzeug.security import generate_password_hash
 from app import db, app
@@ -253,6 +253,82 @@ def search():
     return render_template('home/search.html', keyword=keyword, search_movies=search_movies, search_count=search_count)
 
 
-@home.route('/play/')
-def play():
-    return render_template('home/play.html')
+@home.route('/play/<int:movie_id>/', methods=['GET', 'POST'])
+def play(movie_id):
+    movie = Movie.query.join(Tag).filter(
+        Tag.id == Movie.tag_id,
+        Movie.id == int(movie_id)
+    ).first_or_404()
+
+    if request.method == 'GET':
+        movie.play_num += 1
+        db.session.commit()
+
+    form = CommentForm()
+    if 'login_user' not in session:
+        form.submit.render_kw = {
+            'disabled': "disabled",
+            "class": "btn btn-success",
+            "id": "btn-sub"
+        }
+    if form.validate_on_submit() and 'login_user' in session:
+        data = form.data
+        comment = Comment(
+            content=data['content'],
+            movie_id=movie.id,
+            user_id=session['login_user_id']
+        )
+        db.session.add(comment)
+        movie.comment_num += 1
+        db.session.commit()
+        flash('评论成功', category='ok')
+        return redirect(url_for('home.play', movie_id=movie.id))
+    return render_template('home/play.html', movie=movie, form=form)
+
+
+@home.route('/play/<int:movie_id>/page/<int:page>/', methods=['GET', 'POST'])
+def play(movie_id=None, page=None):
+    movie = Movie.query.join(Tag).filter(
+        Tag.id == Movie.tag_id,
+        Movie.id == int(movie_id)
+    ).first_or_404()
+
+    if request.method == 'GET' and int(request.args.get('page', 0)) != 1:
+        movie.play_num += 1  # 访问量加1
+        db.session.commit()
+
+    form = CommentForm()
+    if 'login_user' not in session:
+        form.submit.render_kw = {
+            'disabled': "disabled",
+            "class": "btn btn-success",
+            "id": "btn-sub"
+        }
+    if form.validate_on_submit() and 'login_user' in session:
+        data = form.data
+        comment = Comment(
+            content=data['content'],
+            movie_id=movie.id,
+            user_id=session['login_user_id']
+        )
+        db.session.add(comment)
+        movie.comment_num += 1
+        db.session.commit()
+        flash('评论成功', category='ok')
+        return redirect(url_for('home.play', movie_id=movie.id, page=1))
+
+    if page is None:
+        page = 1
+    # 查询的时候关联标签，采用join来加进去,多表关联用filter,过滤用filter_by
+    page_comments = Comment.query.join(
+        Movie
+    ).join(
+        User
+    ).filter(
+        Movie.id == movie.id,
+        User.id == Comment.user_id
+    ).order_by(
+        Comment.add_time.desc()
+    ).paginate(page=page, per_page=10)
+
+    return render_template('home/play.html', movie=movie, form=form, page_comments=page_comments)
